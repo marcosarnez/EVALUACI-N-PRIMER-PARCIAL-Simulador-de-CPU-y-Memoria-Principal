@@ -27,6 +27,20 @@ Private Sub PonerMarMdr(ByVal address As Long, ByVal value As Long)
     cpu.Range("B9").Value = value
 End Sub
 
+Public Function PeekRAM(ByVal address As Long) As Long
+    Dim v As Variant
+    If address < 0 Or address > 255 Then
+        PeekRAM = 0
+        Exit Function
+    End If
+    v = HojaRAM.Cells(address + 1, 1).Value
+    If IsNumeric(v) Then
+        PeekRAM = CLng(v) And 255
+    Else
+        PeekRAM = 0
+    End If
+End Function
+
 Public Function ReadRAM(ByVal address As Long) As Long
     Dim v As Long
     If address < 0 Or address > 255 Then
@@ -34,7 +48,7 @@ Public Function ReadRAM(ByVal address As Long) As Long
         ReadRAM = 0
         Exit Function
     End If
-    v = CLng(HojaRAM.Cells(address + 1, 1).Value)
+    v = PeekRAM(address)
     PonerMarMdr address, v
     PintarCasilla address
     ReadRAM = v
