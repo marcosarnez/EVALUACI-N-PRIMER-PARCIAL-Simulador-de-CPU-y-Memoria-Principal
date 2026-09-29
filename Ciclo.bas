@@ -105,12 +105,28 @@ Public Sub BotonResetCiclo()
     HojaCPU.Range("A22").Value = "RESET: registros y PC en cero. La memoria no se borra."
 End Sub
 
-Public Sub BotonCargarPrograma()
+Private Sub BorrarCodigoYDatos()
     Dim i As Long
-    BotonResetCiclo
-    For i = 0 To 15
+    For i = 0 To 63
         WriteRAM i, 0
     Next i
+    WriteRAM &H80, 0
+    WriteRAM &H81, 0
+    WriteRAM &H82, 0
+End Sub
+
+Private Sub DejarListoParaStep()
+    SetReg "PC", 0
+    SetReg "IR", 0
+    SetReg "MAR", 0
+    SetReg "MDR", 0
+    PintarCasilla 0
+    PintarFases -1
+End Sub
+
+Public Sub BotonCargarPrograma()
+    BotonResetCiclo
+    BorrarCodigoYDatos
     WriteRAM 0, &H3
     WriteRAM 1, 0
     WriteRAM 2, &H80
@@ -127,13 +143,80 @@ Public Sub BotonCargarPrograma()
     WriteRAM &H80, 5
     WriteRAM &H81, 3
     WriteRAM &H82, 0
-    SetReg "PC", 0
-    SetReg "IR", 0
-    SetReg "MAR", 0
-    SetReg "MDR", 0
-    PintarCasilla 0
-    PintarFases -1
-    LogLine "Programa: LOAD AX,[80h]  LOAD BX,[81h]  ADD AX,BX  STORE [82h],AX  HLT. Datos 5 y 3."
+    DejarListoParaStep
+    HojaCPU.Range("A20").Value = "Programa 5+3: LOAD AX,[80h] LOAD BX,[81h] ADD AX,BX STORE [82h],AX HLT. Al final AX=8 y la casilla 82h=8."
+    LogLine "Cargado 5+3. Pulsa STEP. Cuatro clics = una instruccion."
+End Sub
+
+Public Sub BotonCargarISA()
+    BotonResetCiclo
+    BorrarCodigoYDatos
+    WriteRAM 0, &H1
+    WriteRAM 1, 0
+    WriteRAM 2, 5
+    WriteRAM 3, &H2
+    WriteRAM 4, 1
+    WriteRAM 5, 0
+    WriteRAM 6, &H4
+    WriteRAM 7, 0
+    WriteRAM 8, &H80
+    WriteRAM 9, &H1
+    WriteRAM 10, 0
+    WriteRAM 11, 0
+    WriteRAM 12, &H3
+    WriteRAM 13, 0
+    WriteRAM 14, &H80
+    WriteRAM 15, &H11
+    WriteRAM 16, 0
+    WriteRAM 17, 1
+    WriteRAM 18, &H12
+    WriteRAM 19, 0
+    WriteRAM 20, 1
+    WriteRAM 21, &H14
+    WriteRAM 22, 1
+    WriteRAM 23, &H15
+    WriteRAM 24, 0
+    WriteRAM 25, &H17
+    WriteRAM 26, 0
+    WriteRAM 27, 1
+    WriteRAM 28, &H18
+    WriteRAM 29, 0
+    WriteRAM 30, 1
+    WriteRAM 31, &H1
+    WriteRAM 32, 0
+    WriteRAM 33, 12
+    WriteRAM 34, &H19
+    WriteRAM 35, 0
+    WriteRAM 36, 1
+    WriteRAM 37, &H1A
+    WriteRAM 38, 0
+    WriteRAM 39, 1
+    WriteRAM 40, &H1B
+    WriteRAM 41, 0
+    WriteRAM 42, &H4
+    WriteRAM 43, 0
+    WriteRAM 44, &H81
+    WriteRAM 45, 0
+    DejarListoParaStep
+    HojaCPU.Range("A20").Value = "ISA: MOV LOAD STORE ADD SUB INC DEC CMP AND OR XOR NOT. Al final AX=247, BX=6, casilla 80h=5, casilla 81h=247, SF=1."
+    LogLine "Cargada la ISA de la tarea 5. Pulsa STEP. Al terminar: AX=247 BX=6."
+End Sub
+
+Public Sub BotonProbarISA()
+    Dim i As Long
+    Dim ok As Boolean
+    BotonCargarISA
+    For i = 1 To 68
+        BotonSTEP
+    Next i
+    ok = (GetReg("AX") = 247 And GetReg("BX") = 6 And PeekRAM(&H80) = 5 And PeekRAM(&H81) = 247 And GetReg("SF") = 1 And NzL("Z2") = 1)
+    If ok Then
+        HojaCPU.Range("Z40").Value = 1
+        LogLine "Tarea 5 bien: MOV, LOAD, STORE, ADD, SUB, INC, DEC, CMP, AND, OR, XOR y NOT coinciden con el calculo a mano."
+    Else
+        HojaCPU.Range("Z40").Value = 0
+        LogLine "Tarea 5 mal: AX=" & GetReg("AX") & " BX=" & GetReg("BX") & " [80h]=" & PeekRAM(&H80) & " [81h]=" & PeekRAM(&H81) & " SF=" & GetReg("SF")
+    End If
 End Sub
 
 Public Sub BotonSTEP()
