@@ -12,6 +12,21 @@ Private Function HojaMem() As Worksheet
     Set HojaMem = ThisWorkbook.Worksheets("Memoria")
 End Function
 
+Private Function HojaCPU() As Worksheet
+    On Error Resume Next
+    Set HojaCPU = ThisWorkbook.Worksheets("CPU")
+End Function
+
+Private Sub PonerMarMdr(ByVal address As Long, ByVal value As Long)
+    Dim cpu As Worksheet
+    HojaMem.Range("F4").Value = address
+    HojaMem.Range("F5").Value = value
+    Set cpu = HojaCPU()
+    If cpu Is Nothing Then Exit Sub
+    cpu.Range("B8").Value = address
+    cpu.Range("B9").Value = value
+End Sub
+
 Public Function ReadRAM(ByVal address As Long) As Long
     Dim v As Long
     If address < 0 Or address > 255 Then
@@ -20,8 +35,7 @@ Public Function ReadRAM(ByVal address As Long) As Long
         Exit Function
     End If
     v = CLng(HojaRAM.Cells(address + 1, 1).Value)
-    HojaMem.Range("F4").Value = address
-    HojaMem.Range("F5").Value = v
+    PonerMarMdr address, v
     PintarCasilla address
     ReadRAM = v
 End Function
@@ -36,8 +50,7 @@ Public Sub WriteRAM(ByVal address As Long, ByVal value As Long)
         Exit Sub
     End If
     HojaRAM.Cells(address + 1, 1).Value = value
-    HojaMem.Range("F4").Value = address
-    HojaMem.Range("F5").Value = value
+    PonerMarMdr address, value
     PintarCasilla address
 End Sub
 
@@ -80,8 +93,7 @@ Public Sub BotonLimpiar()
     For i = 1 To 256
         HojaRAM.Cells(i, 1).Value = 0
     Next i
-    HojaMem.Range("F4").Value = 0
-    HojaMem.Range("F5").Value = 0
+    PonerMarMdr 0, 0
     HojaMem.Range("B4").Value = 0
     HojaMem.Range("B5").Value = 0
     HojaMem.Range("Z1").Value = -1
