@@ -1,67 +1,18 @@
 Option Explicit
 
 ' Banco de registros y ALU de 8 bits.
-' AX y BX se pueden escribir en la hoja. El resto los mueve el simulador.
-
-Private Function HojaCPU() As Worksheet
-    Set HojaCPU = ThisWorkbook.Worksheets("CPU")
-End Function
+' La hoja CPU la escribe solo el modulo UI.
 
 Private Function Byte8(ByVal valor As Long) As Long
     Byte8 = valor And 255
 End Function
 
 Public Function GetReg(ByVal nombre As String) As Long
-    Dim v As Variant
-    v = 0
-    Select Case UCase$(nombre)
-        Case "PC": v = HojaCPU.Range("B6").Value
-        Case "IR": v = HojaCPU.Range("B7").Value
-        Case "MAR": v = HojaCPU.Range("B8").Value
-        Case "MDR": v = HojaCPU.Range("B9").Value
-        Case "AX": v = HojaCPU.Range("B10").Value
-        Case "BX": v = HojaCPU.Range("B11").Value
-        Case "ZF": v = HojaCPU.Range("E13").Value
-        Case "CF": v = HojaCPU.Range("G13").Value
-        Case "SF": v = HojaCPU.Range("I13").Value
-    End Select
-    If IsNumeric(v) Then
-        GetReg = CLng(v)
-    Else
-        GetReg = 0
-    End If
+    GetReg = UiGetReg(nombre)
 End Function
 
 Public Sub SetReg(ByVal nombre As String, ByVal valor As Long)
-    valor = Byte8(valor)
-    Select Case UCase$(nombre)
-        Case "PC": HojaCPU.Range("B6").Value = valor
-        Case "IR": HojaCPU.Range("B7").Value = valor
-        Case "MAR": HojaCPU.Range("B8").Value = valor
-        Case "MDR": HojaCPU.Range("B9").Value = valor
-        Case "AX": HojaCPU.Range("B10").Value = valor
-        Case "BX": HojaCPU.Range("B11").Value = valor
-        Case "ZF": HojaCPU.Range("E13").Value = IIf(valor <> 0, 1, 0)
-        Case "CF": HojaCPU.Range("G13").Value = IIf(valor <> 0, 1, 0)
-        Case "SF": HojaCPU.Range("I13").Value = IIf(valor <> 0, 1, 0)
-    End Select
-    PintarFlags
-End Sub
-
-Public Sub PintarFlags()
-    PintarFlag "E13", GetReg("ZF")
-    PintarFlag "G13", GetReg("CF")
-    PintarFlag "I13", GetReg("SF")
-End Sub
-
-Private Sub PintarFlag(ByVal celda As String, ByVal bit As Long)
-    If bit = 1 Then
-        HojaCPU.Range(celda).Interior.Color = RGB(46, 204, 113)
-        HojaCPU.Range(celda).Font.Color = RGB(20, 40, 20)
-    Else
-        HojaCPU.Range(celda).Interior.Color = RGB(189, 195, 199)
-        HojaCPU.Range(celda).Font.Color = RGB(40, 40, 40)
-    End If
+    UiSetReg nombre, Byte8(valor)
 End Sub
 
 ' Calcula en 8 bits y actualiza ZF, CF y SF.
@@ -112,19 +63,18 @@ Public Function ALU(ByVal op As String, ByVal a As Long, ByVal b As Long) As Lon
         Case Else
             r = a
     End Select
-    HojaCPU.Range("E13").Value = IIf(r = 0, 1, 0)
+    SetReg "ZF", IIf(r = 0, 1, 0)
     If logica Then
-        HojaCPU.Range("G13").Value = 0
+        SetReg "CF", 0
     Else
-        HojaCPU.Range("G13").Value = c
+        SetReg "CF", c
     End If
-    HojaCPU.Range("I13").Value = IIf((r And 128) <> 0, 1, 0)
-    PintarFlags
+    SetReg "SF", IIf((r And 128) <> 0, 1, 0)
     ALU = r
 End Function
 
 Private Sub Mensaje(ByVal texto As String)
-    HojaCPU.Range("A22").Value = texto
+    ThisWorkbook.Worksheets("Pruebas").Range("B2").Value = texto
 End Sub
 
 Public Sub BotonADD()
@@ -226,10 +176,9 @@ Public Sub BotonResetCPU()
     SetReg "MDR", 0
     SetReg "AX", 0
     SetReg "BX", 0
-    HojaCPU.Range("E13").Value = 0
-    HojaCPU.Range("G13").Value = 0
-    HojaCPU.Range("I13").Value = 0
-    PintarFlags
+    SetReg "ZF", 0
+    SetReg "CF", 0
+    SetReg "SF", 0
     Mensaje "Registros y banderas en cero."
 End Sub
 

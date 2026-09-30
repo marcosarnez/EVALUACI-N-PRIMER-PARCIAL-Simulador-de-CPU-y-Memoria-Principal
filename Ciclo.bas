@@ -9,18 +9,8 @@ Public Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 ' Ciclo de instruccion: Fetch -> Decode -> Execute -> Store.
 ' Un STEP avanza una sola fase.
 
-Private Function HojaCPU() As Worksheet
-    Set HojaCPU = ThisWorkbook.Worksheets("CPU")
-End Function
-
 Private Function NzL(ByVal celda As String) As Long
-    Dim v As Variant
-    v = HojaCPU.Range(celda).Value
-    If IsNumeric(v) Then
-        NzL = CLng(v)
-    Else
-        NzL = 0
-    End If
+    NzL = UiState(celda)
 End Function
 
 Private Function Hx(ByVal n As Long) As String
@@ -45,9 +35,9 @@ End Function
 
 Private Sub DestinoReg(ByVal n As Long)
     If (n And 255) = 1 Then
-        HojaCPU.Range("Z6").Value = 2
+        UiStateSet "Z6", 2
     Else
-        HojaCPU.Range("Z6").Value = 1
+        UiStateSet "Z6", 1
     End If
 End Sub
 
@@ -62,55 +52,93 @@ Private Function TamanoOpcode(ByVal op As Long) As Long
     End Select
 End Function
 
+Private Function Hex0x(ByVal n As Long) As String
+    Hex0x = "0x" & Right$("0" & Hex$(n And 255), 2)
+End Function
+
+' Un solo lugar arma el mnemonico. Ejemplo: MOV AX,0x05
+Private Function TextoInstruccion(ByVal op As Long, ByVal a As Long, ByVal b As Long) As String
+    Select Case op
+        Case &H0
+            TextoInstruccion = "HLT"
+        Case &H1
+            TextoInstruccion = "MOV " & NombreReg(a) & "," & Hex0x(b)
+        Case &H2
+            TextoInstruccion = "MOV " & NombreReg(a) & "," & NombreReg(b)
+        Case &H3
+            TextoInstruccion = "LOAD " & NombreReg(a) & ",[" & Hex0x(b) & "]"
+        Case &H4
+            TextoInstruccion = "STORE [" & Hex0x(b) & "]," & NombreReg(a)
+        Case &H10
+            TextoInstruccion = "ADD " & NombreReg(a) & "," & Hex0x(b)
+        Case &H11
+            TextoInstruccion = "ADD " & NombreReg(a) & "," & NombreReg(b)
+        Case &H12
+            TextoInstruccion = "SUB " & NombreReg(a) & "," & Hex0x(b)
+        Case &H13
+            TextoInstruccion = "SUB " & NombreReg(a) & "," & NombreReg(b)
+        Case &H14
+            TextoInstruccion = "INC " & NombreReg(a)
+        Case &H15
+            TextoInstruccion = "DEC " & NombreReg(a)
+        Case &H16
+            TextoInstruccion = "CMP " & NombreReg(a) & "," & Hex0x(b)
+        Case &H17
+            TextoInstruccion = "CMP " & NombreReg(a) & "," & NombreReg(b)
+        Case &H18
+            TextoInstruccion = "AND " & NombreReg(a) & "," & NombreReg(b)
+        Case &H19
+            TextoInstruccion = "OR " & NombreReg(a) & "," & NombreReg(b)
+        Case &H1A
+            TextoInstruccion = "XOR " & NombreReg(a) & "," & NombreReg(b)
+        Case &H1B
+            TextoInstruccion = "NOT " & NombreReg(a)
+        Case &H20
+            TextoInstruccion = "JMP " & Hex0x(a)
+        Case &H21
+            TextoInstruccion = "JZ " & Hex0x(a)
+        Case &H22
+            TextoInstruccion = "JNZ " & Hex0x(a)
+        Case &H23
+            TextoInstruccion = "JC " & Hex0x(a)
+        Case Else
+            TextoInstruccion = "?? " & Hx(op)
+    End Select
+End Function
+
+Private Sub MostrarMnemonico(ByVal texto As String)
+    UiMnemonic texto
+End Sub
+
 Private Sub LogLine(ByVal texto As String)
-    Dim i As Long
-    For i = 45 To 35 Step -1
-        HojaCPU.Cells(i, 1).Value = HojaCPU.Cells(i - 1, 1).Value
-    Next i
-    HojaCPU.Range("A34").Value = texto
-    HojaCPU.Range("A22").Value = texto
+    UiLog texto
 End Sub
 
 Private Sub PintarFases(ByVal activa As Long)
-    PintarCaja "B17", activa = 0, RGB(61, 126, 166)
-    PintarCaja "D17", activa = 1, RGB(138, 109, 59)
-    PintarCaja "F17", activa = 2, RGB(74, 124, 78)
-    PintarCaja "H17", activa = 3, RGB(122, 78, 138)
-End Sub
-
-Private Sub PintarCaja(ByVal celda As String, ByVal onOff As Boolean, ByVal colorOn As Long)
-    If onOff Then
-        HojaCPU.Range(celda).Interior.Color = colorOn
-        HojaCPU.Range(celda).Font.Color = RGB(255, 255, 255)
-    Else
-        HojaCPU.Range(celda).Interior.Color = RGB(200, 205, 210)
-        HojaCPU.Range(celda).Font.Color = RGB(50, 50, 50)
-    End If
+    UiPintarFase activa
 End Sub
 
 Private Sub LimpiarEstadoCiclo()
     Dim i As Long
-    HojaCPU.Range("Z1").Value = 0
-    HojaCPU.Range("Z2").Value = 0
+    UiStateSet "Z1", 0
+    UiStateSet "Z2", 0
     For i = 3 To 21
-        HojaCPU.Range("Z" & i).Value = 0
+        UiStateSet "Z" & CStr(i), 0
     Next i
-    HojaCPU.Range("Z9").Value = 0
-    HojaCPU.Range("Z30").Value = ""
-    HojaCPU.Range("Z42").Value = 0
-    HojaCPU.Range("Z43").Value = 0
-    HojaCPU.Range("A19").Value = "Pulsa CARGAR PROGRAMA y luego STEP."
+    UiStateSet "Z9", 0
+    UiStateSet "Z30", ""
+    UiStateSet "Z42", 0
+    UiStateSet "Z43", 0
+    UiMnemonic ""
+    UiStatus "Pulsa LOAD 5+3 o LOAD FIBO y luego STEP."
     PintarFases -1
 End Sub
 
 Public Sub BotonResetCiclo()
-    Dim i As Long
     BotonResetCPU
     LimpiarEstadoCiclo
-    For i = 34 To 45
-        HojaCPU.Cells(i, 1).Value = ""
-    Next i
-    HojaCPU.Range("A22").Value = "RESET: registros y PC en cero. La memoria no se borra."
+    UiClearLog
+    UiStatus "RESET: registros y PC en cero. La RAM no se borra."
 End Sub
 
 Private Sub BorrarCodigoYDatos()
@@ -152,7 +180,7 @@ Public Sub BotonCargarPrograma()
     WriteRAM &H81, 3
     WriteRAM &H82, 0
     DejarListoParaStep
-    HojaCPU.Range("A20").Value = "Programa 5+3: LOAD AX,[80h] LOAD BX,[81h] ADD AX,BX STORE [82h],AX HLT. Al final AX=8 y la casilla 82h=8."
+    UiStatus "Programa 5+3 cargado."
     LogLine "Cargado 5+3. Pulsa STEP. Cuatro clics = una instruccion."
 End Sub
 
@@ -206,7 +234,7 @@ Public Sub BotonCargarISA()
     WriteRAM 44, &H81
     WriteRAM 45, 0
     DejarListoParaStep
-    HojaCPU.Range("A20").Value = "ISA: MOV LOAD STORE ADD SUB INC DEC CMP AND OR XOR NOT. Al final AX=247, BX=6, casilla 80h=5, casilla 81h=247, SF=1."
+    UiStatus "ISA cargada."
     LogLine "Cargada la ISA de la tarea 5. Pulsa STEP. Al terminar: AX=247 BX=6."
 End Sub
 
@@ -219,10 +247,10 @@ Public Sub BotonProbarISA()
     Next i
     ok = (GetReg("AX") = 247 And GetReg("BX") = 6 And PeekRAM(&H80) = 5 And PeekRAM(&H81) = 247 And GetReg("SF") = 1 And NzL("Z2") = 1)
     If ok Then
-        HojaCPU.Range("Z40").Value = 1
+        UiStateSet "Z40", 1
         LogLine "Tarea 5 bien: MOV, LOAD, STORE, ADD, SUB, INC, DEC, CMP, AND, OR, XOR y NOT coinciden con el calculo a mano."
     Else
-        HojaCPU.Range("Z40").Value = 0
+        UiStateSet "Z40", 0
         LogLine "Tarea 5 mal: AX=" & GetReg("AX") & " BX=" & GetReg("BX") & " [80h]=" & PeekRAM(&H80) & " [81h]=" & PeekRAM(&H81) & " SF=" & GetReg("SF")
     End If
 End Sub
@@ -268,7 +296,7 @@ Public Sub BotonCargarSaltos()
     WriteRAM &H23, &H4D
     WriteRAM &H24, 0
     DejarListoParaStep
-    HojaCPU.Range("A20").Value = "Saltos: JZ no salta si ZF=0, JZ si salta si ZF=1, JMP siempre, JNZ salta si ZF=0. Si BX queda 10 y AX 1, los saltos fueron bien. 99, 88 o 77 en BX seria un salto mal tomado."
+    UiStatus "Saltos cargados."
     LogLine "Cargados los saltos. Pulsa STEP. Al final AX=1 BX=10 y HLT."
 End Sub
 
@@ -282,10 +310,10 @@ Public Sub BotonProbarSaltos()
     Next i
     ok = (GetReg("AX") = 1 And GetReg("BX") = 10 And NzL("Z2") = 1)
     If ok Then
-        HojaCPU.Range("Z41").Value = 1
+        UiStateSet "Z41", 1
         LogLine "Tarea 6 bien: JZ no salto con ZF=0, JZ salto con ZF=1, JMP y JNZ bien, HLT detuvo el reloj. BX no es 99 ni 88 ni 77."
     Else
-        HojaCPU.Range("Z41").Value = 0
+        UiStateSet "Z41", 0
         LogLine "Tarea 6 mal: AX=" & GetReg("AX") & " BX=" & GetReg("BX") & " HLT=" & NzL("Z2")
     End If
 End Sub
@@ -316,7 +344,7 @@ Public Sub BotonCargarFibo()
     WriteRAM &H80, 0
     WriteRAM &H81, 1
     DejarListoParaStep
-    HojaCPU.Range("A20").Value = "Fibonacci: 0,1,1,2,3,5,8,13,21,34,55,89,144,233. El siguiente ADD enciende CF y JC salta a HLT. Casillas 80h y 81h quedan en 144 y 233."
+    UiStatus "Fibonacci cargado."
     LogLine "Cargado Fibonacci. Pulsa STEP o RUN. Empieza con 0 y 1 en 80h y 81h."
 End Sub
 
@@ -330,57 +358,49 @@ Public Sub BotonProbarFibo()
     Next i
     ok = (PeekRAM(&H80) = 144 And PeekRAM(&H81) = 233 And GetReg("CF") = 1 And NzL("Z2") = 1)
     If ok Then
-        HojaCPU.Range("Z44").Value = 1
+        UiStateSet "Z44", 1
         LogLine "Tarea 7 bien: Fibonacci de 8 bits hasta 233. CF=1 y HLT. 80h=144 81h=233."
     Else
-        HojaCPU.Range("Z44").Value = 0
+        UiStateSet "Z44", 0
         LogLine "Tarea 7 mal: [80h]=" & PeekRAM(&H80) & " [81h]=" & PeekRAM(&H81) & " CF=" & GetReg("CF") & " HLT=" & NzL("Z2")
     End If
 End Sub
 
 Private Function DelayMs() As Long
-    Dim v As Variant
-    v = HojaCPU.Range("B23").Value
-    If IsNumeric(v) Then
-        DelayMs = CLng(v)
-    Else
-        DelayMs = 250
-    End If
-    If DelayMs < 0 Then DelayMs = 0
-    If DelayMs > 2000 Then DelayMs = 2000
+    DelayMs = UiDelay()
 End Function
 
 Public Sub BotonPAUSE()
-    HojaCPU.Range("Z42").Value = 1
-    HojaCPU.Range("Z43").Value = 0
+    UiStateSet "Z42", 1
+    UiStateSet "Z43", 0
     LogLine "PAUSE: el reloj se congela en la fase actual. STEP o RUN pueden seguir."
 End Sub
 
 Public Sub BotonRUN()
     If NzL("Z43") = 1 Then Exit Sub
     If NzL("Z2") = 1 Then
-        HojaCPU.Range("A22").Value = "Esta en HLT. Carga un programa y pulsa RUN otra vez."
+        UiStatus "Esta en HLT. LOAD 5+3 o LOAD FIBONACCI y pulsa RUN otra vez."
         Exit Sub
     End If
-    HojaCPU.Range("Z42").Value = 0
-    HojaCPU.Range("Z43").Value = 1
-    LogLine "RUN: ejecucion continua. PAUSE congela. El retardo esta en B23."
+    UiStateSet "Z42", 0
+    UiStateSet "Z43", 1
+    LogLine "RUN: ejecucion continua. PAUSE congela. El retardo esta en Delay (ms)."
     Do While NzL("Z2") = 0 And NzL("Z42") = 0
         BotonSTEP
         DoEvents
         Sleep DelayMs()
     Loop
-    HojaCPU.Range("Z43").Value = 0
+    UiStateSet "Z43", 0
 End Sub
 
 Public Sub BotonSTEP()
     If NzL("Z2") = 1 Then
-        HojaCPU.Range("A22").Value = "Detenido con HLT. Pulsa RESET o un boton CARGAR."
-        HojaCPU.Range("Z43").Value = 0
+        UiStatus "Detenido con HLT. Pulsa RESET, LOAD 5+3 o LOAD FIBONACCI."
+        UiStateSet "Z43", 0
         PintarFases -1
         Exit Sub
     End If
-    HojaCPU.Range("Z9").Value = NzL("Z9") + 1
+    UiStateSet "Z9", NzL("Z9") + 1
     Select Case NzL("Z1")
         Case 0
             HacerFetch
@@ -402,20 +422,21 @@ Private Sub HacerFetch()
     SetReg "IR", op
     sz = TamanoOpcode(op)
     If sz >= 2 Then
-        HojaCPU.Range("Z3").Value = PeekRAM((pc0 + 1) And 255)
+        UiStateSet "Z3", PeekRAM((pc0 + 1) And 255)
     Else
-        HojaCPU.Range("Z3").Value = 0
+        UiStateSet "Z3", 0
     End If
     If sz >= 3 Then
-        HojaCPU.Range("Z4").Value = PeekRAM((pc0 + 2) And 255)
+        UiStateSet "Z4", PeekRAM((pc0 + 2) And 255)
     Else
-        HojaCPU.Range("Z4").Value = 0
+        UiStateSet "Z4", 0
     End If
-    HojaCPU.Range("Z8").Value = sz
+    UiStateSet "Z8", sz
     SetReg "PC", (pc0 + sz) And 255
-    HojaCPU.Range("Z1").Value = 1
+    UiStateSet "Z1", 1
     PintarFases 0
-    LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] FETCH: PC=" & Hx(pc0) & " MAR=" & Hx(pc0) & " MDR=" & Hx(op) & " IR=" & Hx(op) & " PC<-" & Hx((pc0 + sz) And 255)
+    MostrarMnemonico TextoInstruccion(op, NzL("Z3"), NzL("Z4"))
+    LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] FETCH: PC=" & Hx(pc0) & " MAR=" & Hx(pc0) & " MDR=" & Hx(op) & " IR=" & Hx(op) & " " & UiMnemText() & " PC<-" & Hx((pc0 + sz) And 255)
 End Sub
 
 Private Sub HacerDecode()
@@ -426,114 +447,115 @@ Private Sub HacerDecode()
     op = GetReg("IR")
     a = NzL("Z3")
     b = NzL("Z4")
-    HojaCPU.Range("Z6").Value = 0
-    HojaCPU.Range("Z7").Value = 0
-    HojaCPU.Range("Z16").Value = 0
-    HojaCPU.Range("Z17").Value = 0
-    HojaCPU.Range("Z19").Value = 0
-    HojaCPU.Range("Z20").Value = 0
-    HojaCPU.Range("Z21").Value = 0
-    HojaCPU.Range("Z30").Value = ""
+    UiStateSet "Z6", 0
+    UiStateSet "Z7", 0
+    UiStateSet "Z16", 0
+    UiStateSet "Z17", 0
+    UiStateSet "Z19", 0
+    UiStateSet "Z20", 0
+    UiStateSet "Z21", 0
+    UiStateSet "Z30", ""
     texto = "opcode desconocido " & Hx(op)
     Select Case op
         Case &H0
             texto = "HLT"
-            HojaCPU.Range("Z20").Value = 1
-            HojaCPU.Range("Z30").Value = "HLT"
+            UiStateSet "Z20", 1
+            UiStateSet "Z30", "HLT"
         Case &H1
             texto = "MOV " & NombreReg(a) & ", " & Hx(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "MOVIMM"
+            UiStateSet "Z30", "MOVIMM"
         Case &H2
             texto = "MOV " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "MOVREG"
+            UiStateSet "Z30", "MOVREG"
         Case &H3
             texto = "LOAD " & NombreReg(a) & ", [" & Hx(b) & "]"
             DestinoReg a
-            HojaCPU.Range("Z7").Value = b
-            HojaCPU.Range("Z30").Value = "LOAD"
+            UiStateSet "Z7", b
+            UiStateSet "Z30", "LOAD"
         Case &H4
             texto = "STORE [" & Hx(b) & "], " & NombreReg(a)
-            HojaCPU.Range("Z6").Value = 3
-            HojaCPU.Range("Z7").Value = b
-            HojaCPU.Range("Z16").Value = 1
-            HojaCPU.Range("Z30").Value = "STORE"
+            UiStateSet "Z6", 3
+            UiStateSet "Z7", b
+            UiStateSet "Z16", 1
+            UiStateSet "Z30", "STORE"
         Case &H10
             texto = "ADD " & NombreReg(a) & ", " & Hx(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "ADDIMM"
+            UiStateSet "Z30", "ADDIMM"
         Case &H11
             texto = "ADD " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "ADDREG"
+            UiStateSet "Z30", "ADDREG"
         Case &H12
             texto = "SUB " & NombreReg(a) & ", " & Hx(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "SUBIMM"
+            UiStateSet "Z30", "SUBIMM"
         Case &H13
             texto = "SUB " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "SUBREG"
+            UiStateSet "Z30", "SUBREG"
         Case &H14
             texto = "INC " & NombreReg(a)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "INC"
+            UiStateSet "Z30", "INC"
         Case &H15
             texto = "DEC " & NombreReg(a)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "DEC"
+            UiStateSet "Z30", "DEC"
         Case &H16
             texto = "CMP " & NombreReg(a) & ", " & Hx(b)
-            HojaCPU.Range("Z21").Value = 1
-            HojaCPU.Range("Z30").Value = "CMPIMM"
+            UiStateSet "Z21", 1
+            UiStateSet "Z30", "CMPIMM"
         Case &H17
             texto = "CMP " & NombreReg(a) & ", " & NombreReg(b)
-            HojaCPU.Range("Z21").Value = 1
-            HojaCPU.Range("Z30").Value = "CMPREG"
+            UiStateSet "Z21", 1
+            UiStateSet "Z30", "CMPREG"
         Case &H18
             texto = "AND " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "AND"
+            UiStateSet "Z30", "AND"
         Case &H19
             texto = "OR " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "OR"
+            UiStateSet "Z30", "OR"
         Case &H1A
             texto = "XOR " & NombreReg(a) & ", " & NombreReg(b)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "XOR"
+            UiStateSet "Z30", "XOR"
         Case &H1B
             texto = "NOT " & NombreReg(a)
             DestinoReg a
-            HojaCPU.Range("Z30").Value = "NOT"
+            UiStateSet "Z30", "NOT"
         Case &H20
             texto = "JMP " & Hx(a)
-            HojaCPU.Range("Z17").Value = 1
-            HojaCPU.Range("Z18").Value = a
-            HojaCPU.Range("Z19").Value = 0
-            HojaCPU.Range("Z30").Value = "JMP"
+            UiStateSet "Z17", 1
+            UiStateSet "Z18", a
+            UiStateSet "Z19", 0
+            UiStateSet "Z30", "JMP"
         Case &H21
             texto = "JZ " & Hx(a)
-            HojaCPU.Range("Z17").Value = 1
-            HojaCPU.Range("Z18").Value = a
-            HojaCPU.Range("Z19").Value = 1
-            HojaCPU.Range("Z30").Value = "JZ"
+            UiStateSet "Z17", 1
+            UiStateSet "Z18", a
+            UiStateSet "Z19", 1
+            UiStateSet "Z30", "JZ"
         Case &H22
             texto = "JNZ " & Hx(a)
-            HojaCPU.Range("Z17").Value = 1
-            HojaCPU.Range("Z18").Value = a
-            HojaCPU.Range("Z19").Value = 2
-            HojaCPU.Range("Z30").Value = "JNZ"
+            UiStateSet "Z17", 1
+            UiStateSet "Z18", a
+            UiStateSet "Z19", 2
+            UiStateSet "Z30", "JNZ"
         Case &H23
             texto = "JC " & Hx(a)
-            HojaCPU.Range("Z17").Value = 1
-            HojaCPU.Range("Z18").Value = a
-            HojaCPU.Range("Z19").Value = 3
-            HojaCPU.Range("Z30").Value = "JC"
+            UiStateSet "Z17", 1
+            UiStateSet "Z18", a
+            UiStateSet "Z19", 3
+            UiStateSet "Z30", "JC"
     End Select
-    HojaCPU.Range("A19").Value = texto
-    HojaCPU.Range("Z1").Value = 2
+    texto = TextoInstruccion(op, a, b)
+    MostrarMnemonico texto
+    UiStateSet "Z1", 2
     PintarFases 1
     LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] DECODE: " & texto
 End Sub
@@ -544,7 +566,7 @@ Private Sub HacerExecute()
     Dim b As Long
     Dim r As Long
     Dim toma As Boolean
-    kind = CStr(HojaCPU.Range("Z30").Value)
+    kind = UiStateText("Z30")
     a = NzL("Z3")
     b = NzL("Z4")
     r = 0
@@ -594,19 +616,17 @@ Private Sub HacerExecute()
         Case "HLT"
             r = 0
     End Select
-    HojaCPU.Range("Z5").Value = r
-    HojaCPU.Range("Z1").Value = 3
+    UiStateSet "Z5", r
+    UiStateSet "Z1", 3
     PintarFases 2
-    LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] EXECUTE: " & CStr(HojaCPU.Range("A19").Value) & "  resultado=" & r
+    LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] EXECUTE: " & UiMnemText() & "  resultado=" & r
 End Sub
 
 Private Sub PonerMarMdrVisible(ByVal address As Long, ByVal value As Long)
-    Dim dummy As Long
-    dummy = PeekRAM(address)
     ThisWorkbook.Worksheets("Memoria").Range("F4").Value = address
     ThisWorkbook.Worksheets("Memoria").Range("F5").Value = value
-    HojaCPU.Range("B8").Value = address
-    HojaCPU.Range("B9").Value = value
+    SetReg "MAR", address
+    SetReg "MDR", value
     PintarCasilla address
 End Sub
 
@@ -616,13 +636,13 @@ Private Sub HacerStore()
     Dim kind As String
     dest = NzL("Z6")
     r = NzL("Z5")
-    kind = CStr(HojaCPU.Range("Z30").Value)
+    kind = UiStateText("Z30")
     If NzL("Z21") = 0 And dest = 1 Then SetReg "AX", r
     If NzL("Z21") = 0 And dest = 2 Then SetReg "BX", r
     If dest = 3 Then WriteRAM NzL("Z7"), r
     If NzL("Z20") = 1 Then
-        HojaCPU.Range("Z2").Value = 1
-        HojaCPU.Range("Z43").Value = 0
+        UiStateSet "Z2", 1
+        UiStateSet "Z43", 0
         LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] STORE: HLT. El reloj se detiene."
     ElseIf dest = 3 Then
         LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] STORE: RAM[" & Hx(NzL("Z7")) & "] <- " & r
@@ -633,6 +653,6 @@ Private Sub HacerStore()
     Else
         LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] STORE: sin escritura. PC=" & Hx(GetReg("PC"))
     End If
-    HojaCPU.Range("Z1").Value = 0
+    UiStateSet "Z1", 0
     PintarFases 3
 End Sub

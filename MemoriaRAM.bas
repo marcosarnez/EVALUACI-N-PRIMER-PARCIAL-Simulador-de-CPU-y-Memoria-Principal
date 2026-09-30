@@ -12,19 +12,11 @@ Private Function HojaMem() As Worksheet
     Set HojaMem = ThisWorkbook.Worksheets("Memoria")
 End Function
 
-Private Function HojaCPU() As Worksheet
-    On Error Resume Next
-    Set HojaCPU = ThisWorkbook.Worksheets("CPU")
-End Function
-
 Private Sub PonerMarMdr(ByVal address As Long, ByVal value As Long)
-    Dim cpu As Worksheet
     HojaMem.Range("F4").Value = address
     HojaMem.Range("F5").Value = value
-    Set cpu = HojaCPU()
-    If cpu Is Nothing Then Exit Sub
-    cpu.Range("B8").Value = address
-    cpu.Range("B9").Value = value
+    SetReg "MAR", address
+    SetReg "MDR", value
 End Sub
 
 Public Function PeekRAM(ByVal address As Long) As Long
@@ -110,7 +102,7 @@ Public Sub BotonLimpiar()
     PonerMarMdr 0, 0
     HojaMem.Range("B4").Value = 0
     HojaMem.Range("B5").Value = 0
-    HojaMem.Range("Z1").Value = -1
+    UiStateSet "MapPrev", -1
     RepintarMapa
     HojaMem.Range("A7").Value = "Memoria en cero."
 End Sub
@@ -130,34 +122,9 @@ Private Function NumeroEn(ByVal celda As Range, ByVal minimo As Long, ByVal maxi
 End Function
 
 Public Sub PintarCasilla(ByVal address As Long)
-    Dim ws As Worksheet
-    Dim prev As Long
-    Set ws = HojaMem
-    If IsNumeric(ws.Range("Z1").Value) Then
-        prev = CLng(ws.Range("Z1").Value)
-        If prev >= 0 And prev <= 255 And prev <> address Then
-            ColorBase CeldaDe(prev), prev
-        End If
-    End If
-    CeldaDe(address).Interior.Color = RGB(249, 231, 159)
-    ws.Range("Z1").Value = address
+    UiPintarMapa address
 End Sub
 
 Public Sub RepintarMapa()
-    Dim addr As Long
-    For addr = 0 To 255
-        ColorBase CeldaDe(addr), addr
-    Next addr
-End Sub
-
-Private Function CeldaDe(ByVal address As Long) As Range
-    Set CeldaDe = HojaMem.Cells(11 + (address \ 16), 2 + (address Mod 16))
-End Function
-
-Private Sub ColorBase(ByVal celda As Range, ByVal address As Long)
-    If address < 128 Then
-        celda.Interior.Color = RGB(214, 234, 248)
-    Else
-        celda.Interior.Color = RGB(213, 245, 227)
-    End If
+    UiRepintarMapa
 End Sub
