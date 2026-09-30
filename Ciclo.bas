@@ -1,5 +1,11 @@
 Option Explicit
 
+#If VBA7 Then
+Public Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#Else
+Public Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+#End If
+
 ' Ciclo de instruccion: Fetch -> Decode -> Execute -> Store.
 ' Un STEP avanza una sola fase.
 
@@ -91,6 +97,8 @@ Private Sub LimpiarEstadoCiclo()
     Next i
     HojaCPU.Range("Z9").Value = 0
     HojaCPU.Range("Z30").Value = ""
+    HojaCPU.Range("Z42").Value = 0
+    HojaCPU.Range("Z43").Value = 0
     HojaCPU.Range("A19").Value = "Pulsa CARGAR PROGRAMA y luego STEP."
     PintarFases -1
 End Sub
@@ -282,9 +290,93 @@ Public Sub BotonProbarSaltos()
     End If
 End Sub
 
+Public Sub BotonCargarFibo()
+    BotonResetCiclo
+    BorrarCodigoYDatos
+    WriteRAM &H0, &H3
+    WriteRAM &H1, 0
+    WriteRAM &H2, &H80
+    WriteRAM &H3, &H3
+    WriteRAM &H4, 1
+    WriteRAM &H5, &H81
+    WriteRAM &H6, &H11
+    WriteRAM &H7, 0
+    WriteRAM &H8, 1
+    WriteRAM &H9, &H23
+    WriteRAM &HA, &H13
+    WriteRAM &HB, &H4
+    WriteRAM &HC, 1
+    WriteRAM &HD, &H80
+    WriteRAM &HE, &H4
+    WriteRAM &HF, 0
+    WriteRAM &H10, &H81
+    WriteRAM &H11, &H20
+    WriteRAM &H12, 0
+    WriteRAM &H13, 0
+    WriteRAM &H80, 0
+    WriteRAM &H81, 1
+    DejarListoParaStep
+    HojaCPU.Range("A20").Value = "Fibonacci: 0,1,1,2,3,5,8,13,21,34,55,89,144,233. El siguiente ADD enciende CF y JC salta a HLT. Casillas 80h y 81h quedan en 144 y 233."
+    LogLine "Cargado Fibonacci. Pulsa STEP o RUN. Empieza con 0 y 1 en 80h y 81h."
+End Sub
+
+Public Sub BotonProbarFibo()
+    Dim i As Long
+    Dim ok As Boolean
+    BotonCargarFibo
+    For i = 1 To 2000
+        If NzL("Z2") = 1 Then Exit For
+        BotonSTEP
+    Next i
+    ok = (PeekRAM(&H80) = 144 And PeekRAM(&H81) = 233 And GetReg("CF") = 1 And NzL("Z2") = 1)
+    If ok Then
+        HojaCPU.Range("Z44").Value = 1
+        LogLine "Tarea 7 bien: Fibonacci de 8 bits hasta 233. CF=1 y HLT. 80h=144 81h=233."
+    Else
+        HojaCPU.Range("Z44").Value = 0
+        LogLine "Tarea 7 mal: [80h]=" & PeekRAM(&H80) & " [81h]=" & PeekRAM(&H81) & " CF=" & GetReg("CF") & " HLT=" & NzL("Z2")
+    End If
+End Sub
+
+Private Function DelayMs() As Long
+    Dim v As Variant
+    v = HojaCPU.Range("B23").Value
+    If IsNumeric(v) Then
+        DelayMs = CLng(v)
+    Else
+        DelayMs = 250
+    End If
+    If DelayMs < 0 Then DelayMs = 0
+    If DelayMs > 2000 Then DelayMs = 2000
+End Function
+
+Public Sub BotonPAUSE()
+    HojaCPU.Range("Z42").Value = 1
+    HojaCPU.Range("Z43").Value = 0
+    LogLine "PAUSE: el reloj se congela en la fase actual. STEP o RUN pueden seguir."
+End Sub
+
+Public Sub BotonRUN()
+    If NzL("Z43") = 1 Then Exit Sub
+    If NzL("Z2") = 1 Then
+        HojaCPU.Range("A22").Value = "Esta en HLT. Carga un programa y pulsa RUN otra vez."
+        Exit Sub
+    End If
+    HojaCPU.Range("Z42").Value = 0
+    HojaCPU.Range("Z43").Value = 1
+    LogLine "RUN: ejecucion continua. PAUSE congela. El retardo esta en B23."
+    Do While NzL("Z2") = 0 And NzL("Z42") = 0
+        BotonSTEP
+        DoEvents
+        Sleep DelayMs()
+    Loop
+    HojaCPU.Range("Z43").Value = 0
+End Sub
+
 Public Sub BotonSTEP()
     If NzL("Z2") = 1 Then
         HojaCPU.Range("A22").Value = "Detenido con HLT. Pulsa RESET o un boton CARGAR."
+        HojaCPU.Range("Z43").Value = 0
         PintarFases -1
         Exit Sub
     End If
@@ -530,6 +622,7 @@ Private Sub HacerStore()
     If dest = 3 Then WriteRAM NzL("Z7"), r
     If NzL("Z20") = 1 Then
         HojaCPU.Range("Z2").Value = 1
+        HojaCPU.Range("Z43").Value = 0
         LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] STORE: HLT. El reloj se detiene."
     ElseIf dest = 3 Then
         LogLine "[Paso " & Format$(NzL("Z9"), "00") & "] STORE: RAM[" & Hx(NzL("Z7")) & "] <- " & r
