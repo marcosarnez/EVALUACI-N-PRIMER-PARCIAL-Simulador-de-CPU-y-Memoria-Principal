@@ -219,9 +219,72 @@ Public Sub BotonProbarISA()
     End If
 End Sub
 
+Public Sub BotonCargarSaltos()
+    BotonResetCiclo
+    BorrarCodigoYDatos
+    WriteRAM &H0, &H1
+    WriteRAM &H1, 0
+    WriteRAM &H2, 5
+    WriteRAM &H3, &H16
+    WriteRAM &H4, 0
+    WriteRAM &H5, 0
+    WriteRAM &H6, &H21
+    WriteRAM &H7, &H21
+    WriteRAM &H8, &H1
+    WriteRAM &H9, 1
+    WriteRAM &HA, 10
+    WriteRAM &HB, &H16
+    WriteRAM &HC, 0
+    WriteRAM &HD, 5
+    WriteRAM &HE, &H21
+    WriteRAM &HF, &H14
+    WriteRAM &H10, &H1
+    WriteRAM &H11, 1
+    WriteRAM &H12, &H63
+    WriteRAM &H13, 0
+    WriteRAM &H14, &H1
+    WriteRAM &H15, 0
+    WriteRAM &H16, 1
+    WriteRAM &H17, &H20
+    WriteRAM &H18, &H1C
+    WriteRAM &H19, &H1
+    WriteRAM &H1A, 1
+    WriteRAM &H1B, &H58
+    WriteRAM &H1C, &H16
+    WriteRAM &H1D, 0
+    WriteRAM &H1E, 0
+    WriteRAM &H1F, &H22
+    WriteRAM &H20, &H24
+    WriteRAM &H21, &H1
+    WriteRAM &H22, 1
+    WriteRAM &H23, &H4D
+    WriteRAM &H24, 0
+    DejarListoParaStep
+    HojaCPU.Range("A20").Value = "Saltos: JZ no salta si ZF=0, JZ si salta si ZF=1, JMP siempre, JNZ salta si ZF=0. Si BX queda 10 y AX 1, los saltos fueron bien. 99, 88 o 77 en BX seria un salto mal tomado."
+    LogLine "Cargados los saltos. Pulsa STEP. Al final AX=1 BX=10 y HLT."
+End Sub
+
+Public Sub BotonProbarSaltos()
+    Dim i As Long
+    Dim ok As Boolean
+    BotonCargarSaltos
+    For i = 1 To 80
+        If NzL("Z2") = 1 Then Exit For
+        BotonSTEP
+    Next i
+    ok = (GetReg("AX") = 1 And GetReg("BX") = 10 And NzL("Z2") = 1)
+    If ok Then
+        HojaCPU.Range("Z41").Value = 1
+        LogLine "Tarea 6 bien: JZ no salto con ZF=0, JZ salto con ZF=1, JMP y JNZ bien, HLT detuvo el reloj. BX no es 99 ni 88 ni 77."
+    Else
+        HojaCPU.Range("Z41").Value = 0
+        LogLine "Tarea 6 mal: AX=" & GetReg("AX") & " BX=" & GetReg("BX") & " HLT=" & NzL("Z2")
+    End If
+End Sub
+
 Public Sub BotonSTEP()
     If NzL("Z2") = 1 Then
-        HojaCPU.Range("A22").Value = "Detenido con HLT. Pulsa RESET o CARGAR PROGRAMA."
+        HojaCPU.Range("A22").Value = "Detenido con HLT. Pulsa RESET o un boton CARGAR."
         PintarFases -1
         Exit Sub
     End If
