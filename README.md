@@ -1,12 +1,12 @@
 # Simulador de CPU von Neumann de 8 bits
 
-Proyecto del primer parcial de Arquitectura de Computadoras (SIS-131), Universidad Católica Boliviana San Pablo. El simulador corre en Excel con macros VBA (`.xlsm`). Modela una CPU de 8 bits y una RAM de 256 bytes. Cada **STEP** ejecuta una sola fase del ciclo: Fetch, Decode, Execute o Store.
+Simulador en Excel con macros VBA del primer parcial de Arquitectura de Computadoras (SIS-131), Universidad Católica Boliviana San Pablo. Modela una CPU de 8 bits y una RAM de 256 bytes. Cada **STEP** ejecuta una fase del ciclo: Fetch, Decode, Execute o Store.
 
 ## Cómo abrirlo
 
 1. Abre `simulador-cpu.xlsm`.
-2. Si Excel avisa, habilita las macros. Si el archivo llegó bloqueado: clic derecho, Propiedades, Desbloquear.
-3. Trabaja en la hoja **CPU**. La hoja **RAM** guarda el byte de cada casilla (fila 1 = dirección 0). No la edites a mano. La hoja **Inspección** lista las 256 casillas en hexadecimal, binario y decimal.
+2. Habilita las macros. Si el archivo llegó bloqueado: clic derecho, Propiedades, Desbloquear.
+3. Trabaja en la hoja **CPU**. La hoja **RAM** guarda el byte de cada casilla (fila 1 = dirección 0). La hoja **Inspección** lista las 256 casillas en hexadecimal, binario y decimal.
 
 ## Arquitectura
 
@@ -26,17 +26,24 @@ flowchart LR
     MDR --> RAM
 ```
 
-Una sola memoria guarda el programa (`00h`–`7Fh`) y los datos (`80h`–`FFh`). El CPU no escribe esa memoria por su cuenta: solo `ReadRAM` y `WriteRAM`.
+Una sola memoria guarda el programa (`00h`–`7Fh`) y los datos (`80h`–`FFh`). El CPU no escribe la RAM por su cuenta: solo `ReadRAM` y `WriteRAM`.
+
+### Ciclo de instrucción
+
+1. **Fetch.** `PC → MAR`, `ReadRAM → MDR → IR`, y el PC avanza el tamaño de la instrucción.
+2. **Decode.** La unidad de control lee el opcode del IR y prepara los operandos.
+3. **Execute.** La ALU opera, o se decide un salto, y se actualizan las banderas.
+4. **Store.** El resultado se escribe en AX, en BX o en la RAM. `CMP` no escribe. `HLT` detiene el reloj.
 
 ## Manual
 
-1. Pulsa **LOAD FIBO** (programa obligatorio) o **LOAD 5+3** (ejemplo `a = 5`, `b = 3`, `c = a + b`).
-2. **STEP** avanza una fase. Cuatro clics completan una instrucción. La fase encendida y la columna **Estado** marcan qué está trabajando. La celda amarilla del mapa es la casilla activa.
-3. El mnemónico (por ejemplo `LOAD AX,[0x80]`) aparece una sola vez, en **Celda seleccionada**.
-4. **RUN** sigue solo. **PAUSE** congela el reloj. El retardo está en **Delay (ms)** (250 va bien en la defensa).
+1. Pulsa **LOAD FIBO** o **LOAD 5+3** (`a = 5`, `b = 3`, `c = a + b`).
+2. **STEP** avanza una fase. Cuatro clics completan una instrucción. La fase encendida y la columna **Estado** marcan el registro activo. La celda amarilla del mapa es la casilla en uso.
+3. El mnemónico (por ejemplo `LOAD AX,[0x80]`) aparece en **Celda seleccionada**.
+4. **RUN** sigue solo. **PAUSE** congela el reloj. El retardo está en **Delay (ms)**.
 5. **RESET** pone PC, IR, MAR, MDR, AX, BX y las banderas en cero, apaga **ACTIVO** y vacía el log. No borra la RAM.
-6. **HLT** detiene STEP y RUN. Para seguir, carga de nuevo o pulsa RESET.
-7. El log muestra lo más reciente arriba, con la forma `[Paso NN] FASE: detalle`. Hay una sola línea de estado.
+6. **HLT** detiene STEP y RUN. Para seguir, carga un programa o pulsa RESET.
+7. El log muestra lo más reciente arriba, con la forma `[Paso NN] FASE: detalle`.
 
 ## ISA
 
@@ -66,20 +73,11 @@ El byte de registro vale `00` para AX y `01` para BX.
 | `JNZ dir` | `22` | 2 | dir8 | Salta si ZF = 0 | — |
 | `JC dir` | `23` | 2 | dir8 | Salta si CF = 1 | — |
 
-**ZF** = 1 si el resultado es 0. **CF** = 1 si hubo acarreo o préstamo fuera de 8 bits. **SF** = bit 7 del resultado.
+**ZF** vale 1 si el resultado es 0. **CF** vale 1 si hubo acarreo o préstamo fuera de 8 bits. **SF** es el bit 7 del resultado.
 
-Pruebas de banderas, en el panel de la ALU: `255 + 1` deja AX = 0, ZF = 1, CF = 1. `0 - 1` deja AX = 255, CF = 1, SF = 1. `CMP AX, AX` deja ZF = 1 y no cambia AX.
+## Programa Fibonacci
 
-## Ciclo de instrucción
-
-1. **Fetch.** `PC → MAR`, `ReadRAM → MDR → IR`, el PC avanza el tamaño de la instrucción.
-2. **Decode.** La unidad de control lee el opcode del IR y prepara los operandos. Ahí aparece el mnemónico.
-3. **Execute.** La ALU opera, o se decide un salto, y se actualizan las banderas.
-4. **Store.** El resultado se escribe en AX, en BX o en la RAM. `CMP` no escribe. `HLT` para el reloj.
-
-## Traza del Fibonacci
-
-Programa en `00h`–`13h`. Datos: `80h` = a, `81h` = b. Arranque: a = 0, b = 1. AX = 0, BX = 0, ZF = 0, CF = 0, SF = 0.
+Código en `00h`–`13h`. Datos: `80h` = a, `81h` = b. Arranque: a = 0, b = 1.
 
 ```
 00  LOAD AX,[0x80]
@@ -94,45 +92,35 @@ Programa en `00h`–`13h`. Datos: `80h` = a, `81h` = b. Arranque: a = 0, b = 1. 
 
 Bytes: `03 00 80 03 01 81 11 00 01 23 13 04 01 80 04 00 81 20 00 00`.
 
-Primera vuelta, al terminar cada instrucción (después de Store):
+Primera vuelta, después de Store de cada instrucción:
 
 | Instrucción | PC | IR | AX | BX | ZF | CF | SF | Memoria |
 |-------------|----|----|----|----|----|----|----|---------|
-| inicio | 00 | — | 0 | 0 | 0 | 0 | 0 | 80h=0, 81h=1 |
+| inicio | 00 | — | 0 | 0 | 0 | 0 | 0 | 80h = 0, 81h = 1 |
 | `LOAD AX,[0x80]` | 03 | 03 | 0 | 0 | 0 | 0 | 0 | igual |
 | `LOAD BX,[0x81]` | 06 | 03 | 0 | 1 | 0 | 0 | 0 | igual |
 | `ADD AX,BX` | 09 | 11 | 1 | 1 | 0 | 0 | 0 | igual |
-| `JC 0x13` | 0B | 23 | 1 | 1 | 0 | 0 | 0 | CF=0, no salta |
-| `STORE [0x80],BX` | 0E | 04 | 1 | 1 | 0 | 0 | 0 | 80h=1 |
-| `STORE [0x81],AX` | 11 | 04 | 1 | 1 | 0 | 0 | 0 | 81h=1 |
+| `JC 0x13` | 0B | 23 | 1 | 1 | 0 | 0 | 0 | CF = 0, no salta |
+| `STORE [0x80],BX` | 0E | 04 | 1 | 1 | 0 | 0 | 0 | 80h = 1 |
+| `STORE [0x81],AX` | 11 | 04 | 1 | 1 | 0 | 0 | 0 | 81h = 1 |
 | `JMP 0x00` | 00 | 20 | 1 | 1 | 0 | 0 | 0 | vuelve al inicio |
 
-La serie sigue hasta guardar 144 y 233. La suma siguiente es 144 + 233 = 377. No cabe en 8 bits: AX queda 121, CF = 1, SF = 0, ZF = 0. `JC 0x13` sí salta y `HLT` detiene el reloj. Las casillas quedan `80h` = 144 y `81h` = 233.
+La serie sigue hasta guardar 144 y 233. La suma siguiente es 144 + 233 = 377. No cabe en 8 bits: AX queda 121, CF = 1. `JC 0x13` salta y `HLT` detiene el reloj. Las casillas quedan en 144 y 233.
 
 | Momento | PC | IR | AX | BX | ZF | CF | SF |
 |---------|----|----|----|----|----|----|----|
-| `ADD` de 144+233, tras Store | 09 | 11 | 121 | 233 | 0 | 1 | 0 |
+| `ADD` de 144 + 233, tras Store | 09 | 11 | 121 | 233 | 0 | 1 | 0 |
 | `JC 0x13` tomado | 13 | 23 | 121 | 233 | 0 | 1 | 0 |
 | `HLT` | 14 | 00 | 121 | 233 | 0 | 1 | 0 |
 
-## Estructura
+## Archivos
 
-Archivos del simulador, junto al libro:
-
-- `simulador-cpu.xlsm` — libro con las hojas CPU, RAM e Inspección
-- `CPU.bas` — registros, ALU y banderas
-- `UI.bas` — la única rutina que escribe en la hoja CPU
-- `Ciclo.bas` — Fetch, Decode, Execute, Store, LOAD, RUN, PAUSE, RESET
-- `MemoriaRAM.bas` — `ReadRAM` y `WriteRAM`
-- `ThisWorkbook.cls` — protección de las hojas al abrir
-- `README.md` — este manual
-
-## Código para la defensa
-
-| Pregunta | Dónde | Qué decir |
-|----------|--------|-----------|
-| Cómo se lee la RAM | `MemoriaRAM.bas`, `ReadRAM` | Pone la dirección en MAR, el byte en MDR y lo devuelve. |
-| Cómo se escribe | `WriteRAM` | Es la única rutina que cambia la hoja RAM. |
-| Cómo avanza el reloj | `Ciclo.bas`, `BotonSTEP` | Según la fase llama Fetch, Decode, Execute o Store. |
-| Dónde se suman 8 bits | `CPU.bas`, `ALU` | Si la suma pasa de 255, CF = 1 y se guarda el byte bajo. |
-| Dónde salta el Fibonacci | `HacerExecute`, caso `JC` | Si CF = 1, PC = destino. |
+| Archivo | Contenido |
+|---------|-----------|
+| `simulador-cpu.xlsm` | Libro: hojas CPU, RAM e Inspección |
+| `CPU.bas` | Registros, ALU y banderas |
+| `UI.bas` | Escritura de la hoja CPU |
+| `Ciclo.bas` | Fases, carga de programas, RUN, PAUSE y RESET |
+| `MemoriaRAM.bas` | `ReadRAM` y `WriteRAM` |
+| `ThisWorkbook.cls` | Protección de las hojas al abrir |
+| `README.md` | Este documento |
